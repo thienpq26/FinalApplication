@@ -12,7 +12,11 @@
         <service
             android:name=".MidService"
             android:enabled="true"
-            android:exported="true"></service>
+            android:exported="true">
+            <intent-filter>
+                <action android:name="ACTION_MIDSERVICE_BIND" />
+            </intent-filter>
+        </service>
 
         <activity android:name=".MainActivity">
             <intent-filter>
