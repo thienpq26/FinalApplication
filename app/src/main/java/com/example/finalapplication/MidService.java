@@ -236,7 +236,7 @@ public class MidService extends Service implements IServiceInterface {
 
     @Override
     public TestCapability getCapability() throws RemoteException {
-        return new TestCapability(mConfigurationService.isSupport(IConfigurationService.CONFIG_DISTANCE), mConfigurationService.isSupport(IConfigurationService.CONFIG_DISTANCE), mConfigurationService.isSupport(IConfigurationService.CONFIG_DISTANCE));
+        return new TestCapability(mConfigurationService.isSupport(IConfigurationService.CONFIG_DISTANCE), mConfigurationService.isSupport(IConfigurationService.CONFIG_CONSUMPTION), mConfigurationService.isSupport(IConfigurationService.CONFIG_RESET));
     }
 
     @Override
@@ -256,6 +256,7 @@ public class MidService extends Service implements IServiceInterface {
         for (int i = 0; i < 15; i++) {
             mList15[i] = 0;
         }
+        ihmiListener.onConsumptionChanged(mList15);
     }
 
     @Override
