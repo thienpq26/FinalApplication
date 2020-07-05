@@ -147,7 +147,7 @@ public class MidService extends Service {
                             ihmiListener.onDistanceUnitChanged((Integer) event.getValue());
                             break;
                         } catch (RemoteException e) {
-                            Log.e(TAG, "Failed to OnDistanceUnitChanged: ");
+                            Log.e(TAG, "OnDistanceUnitChanged to failed: ");
                             e.printStackTrace();
                         }
                     }
@@ -156,7 +156,7 @@ public class MidService extends Service {
                             ihmiListener.onDistanceChanged((Double) event.getValue());
                             break;
                         } catch (RemoteException e) {
-                            Log.e(TAG, "Failed to OnDistanceChanged ");
+                            Log.e(TAG, "OnDistanceChanged to failed: ");
                             e.printStackTrace();
                         }
                     }
@@ -165,7 +165,7 @@ public class MidService extends Service {
                             ihmiListener.OnConsumptionUnitChanged((Integer) event.getValue());
                             break;
                         } catch (RemoteException e) {
-                            Log.e(TAG, "Failed to OnConsumptionUnitChanged ");
+                            Log.e(TAG, "OnConsumptionUnitChanged to failed: ");
                             e.printStackTrace();
                         }
                     }
@@ -186,7 +186,7 @@ public class MidService extends Service {
                             try {
                                 ihmiListener.onConsumptionChanged(mList15);
                             } catch (RemoteException e) {
-                                Log.e(TAG, "Failed to onConsumptionChanged ");
+                                Log.e(TAG, "OnConsumptionChanged to failed: ");
                                 e.printStackTrace();
                             }
                             sumConsumption = 0;
@@ -198,7 +198,7 @@ public class MidService extends Service {
                             try {
                                 ihmiListener.onError((Boolean) event.getValue());
                             } catch (RemoteException e) {
-                                Log.e(TAG, "Failed to onError ");
+                                Log.e(TAG, "OnError to failed: ");
                                 e.printStackTrace();
                             }
                         }
@@ -208,7 +208,7 @@ public class MidService extends Service {
                 try {
                     ihmiListener.onError(true);
                 } catch (RemoteException e) {
-                    Log.e(TAG, "Failed to onError ");
+                    Log.e(TAG, "OnError to failed: ");
                     e.printStackTrace();
                 }
             }
