@@ -40,43 +40,64 @@ public class MidService extends Service {
     private double[] mList15 = new double[LIST_HISTORY_SIZE];
     private List<Double> mList60 = new ArrayList<>();
     double sumConsumption = 0.0;
+    private IPropertyService mPropertyService;
+    private IConfigurationService mConfigurationService;
+
+    private ServiceConnection mCoreServiceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            mCoreService = ICoreService.Stub.asInterface(service);
+            try {
+                mPropertyService = mCoreService.getPropertyService();
+                mConfigurationService = mCoreService.getConfigurationService();
+            } catch (RemoteException e) {
+                Log.e(TAG, "Connect to CoreService fail");
+                e.printStackTrace();
+            }
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            mCoreService = null;
+        }
+    };
 
     private IServiceInterface.Stub iBinderServiceInterface = new IServiceInterface.Stub() {
 
         @Override
         public void registerListener(IHMIListener listener) throws RemoteException {
             ihmiListener = listener;
-            mCoreService.getPropertyService().registerListener(IPropertyService.PROP_DISTANCE_UNIT, object);
-            mCoreService.getPropertyService().registerListener(IPropertyService.PROP_DISTANCE_VALUE, object);
-            mCoreService.getPropertyService().registerListener(IPropertyService.PROP_CONSUMPTION_UNIT, object);
-            mCoreService.getPropertyService().registerListener(IPropertyService.PROP_CONSUMPTION_VALUE, object);
-            mCoreService.getPropertyService().registerListener(IPropertyService.PROP_RESET, object);
+            mPropertyService.registerListener(IPropertyService.PROP_DISTANCE_UNIT, object);
+            mPropertyService.registerListener(IPropertyService.PROP_DISTANCE_VALUE, object);
+            mPropertyService.registerListener(IPropertyService.PROP_CONSUMPTION_UNIT, object);
+            mPropertyService.registerListener(IPropertyService.PROP_CONSUMPTION_VALUE, object);
+            mPropertyService.registerListener(IPropertyService.PROP_RESET, object);
         }
 
         @Override
         public void unregisterListener(IHMIListener listener) throws RemoteException {
-            mCoreService.getPropertyService().unregisterListener(IPropertyService.PROP_DISTANCE_UNIT, object);
-            mCoreService.getPropertyService().unregisterListener(IPropertyService.PROP_DISTANCE_VALUE, object);
-            mCoreService.getPropertyService().unregisterListener(IPropertyService.PROP_CONSUMPTION_UNIT, object);
-            mCoreService.getPropertyService().unregisterListener(IPropertyService.PROP_CONSUMPTION_VALUE, object);
-            mCoreService.getPropertyService().unregisterListener(IPropertyService.PROP_RESET, object);
+            mPropertyService.unregisterListener(IPropertyService.PROP_DISTANCE_UNIT, object);
+            mPropertyService.unregisterListener(IPropertyService.PROP_DISTANCE_VALUE, object);
+            mPropertyService.unregisterListener(IPropertyService.PROP_CONSUMPTION_UNIT, object);
+            mPropertyService.unregisterListener(IPropertyService.PROP_CONSUMPTION_VALUE, object);
+            mPropertyService.unregisterListener(IPropertyService.PROP_RESET, object);
         }
 
         @Override
         public TestCapability getCapability() throws RemoteException {
-            return new TestCapability(mCoreService.getConfigurationService().isSupport(IConfigurationService.CONFIG_DISTANCE), mCoreService.getConfigurationService().isSupport(IConfigurationService.CONFIG_CONSUMPTION), mCoreService.getConfigurationService().isSupport(IConfigurationService.CONFIG_RESET));
+            return new TestCapability(mConfigurationService.isSupport(IConfigurationService.CONFIG_DISTANCE), mConfigurationService.isSupport(IConfigurationService.CONFIG_CONSUMPTION), mConfigurationService.isSupport(IConfigurationService.CONFIG_RESET));
         }
 
         @Override
         public void setDistanceUnit(int unit) throws RemoteException {
             PropertyEvent event = new PropertyEvent(IPropertyService.PROP_DISTANCE_UNIT, PropertyEvent.STATUS_AVAILABLE, 0, unit);
-            mCoreService.getPropertyService().setProperty(IPropertyService.PROP_DISTANCE_UNIT, event);
+            mPropertyService.setProperty(IPropertyService.PROP_DISTANCE_UNIT, event);
         }
 
         @Override
         public void setConsumptionUnit(int unit) throws RemoteException {
             PropertyEvent event = new PropertyEvent(IPropertyService.PROP_CONSUMPTION_UNIT, PropertyEvent.STATUS_AVAILABLE, 0, unit);
-            mCoreService.getPropertyService().setProperty(IPropertyService.PROP_CONSUMPTION_UNIT, event);
+            mPropertyService.setProperty(IPropertyService.PROP_CONSUMPTION_UNIT, event);
         }
 
         @Override
@@ -88,17 +109,111 @@ public class MidService extends Service {
         }
     };
 
-    private ServiceConnection mCoreServiceConnection = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            mCoreService = ICoreService.Stub.asInterface(service);
+    @Override
+    public void onCreate() {
+        mHandlerThread = new HandlerThread(TAG);
+        mHandlerThread.start();
+        mHandler = new ServiceHandler(mHandlerThread.getLooper());
+        bindCoreService();
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return iBinderServiceInterface;
+    }
+
+    private void bindCoreService() {
+        Intent intent = new Intent();
+        intent.setAction("dcv.finaltest.BIND");
+        intent.setPackage("dcv.finaltest.hmiapplication");
+        if (!bindService(intent, mCoreServiceConnection, Context.BIND_AUTO_CREATE)) {
+            Log.e(TAG, "bindService connect to CoreService fail.");
+        }
+    }
+
+    private class ServiceHandler extends Handler {
+
+        ServiceHandler(Looper looper) {
+            super(looper);
         }
 
         @Override
-        public void onServiceDisconnected(ComponentName name) {
-            mCoreService = null;
+        public void handleMessage(@NonNull Message msg) {
+            PropertyEvent event = (PropertyEvent) msg.obj;
+            if (event.getStatus() == PropertyEvent.STATUS_AVAILABLE) {
+                switch (msg.what) {
+                    case IPropertyService.PROP_DISTANCE_UNIT: {
+                        try {
+                            ihmiListener.onDistanceUnitChanged((Integer) event.getValue());
+                            break;
+                        } catch (RemoteException e) {
+                            Log.e(TAG, "Failed to OnDistanceUnitChanged: ");
+                            e.printStackTrace();
+                        }
+                    }
+                    case IPropertyService.PROP_DISTANCE_VALUE: {
+                        try {
+                            ihmiListener.onDistanceChanged((Double) event.getValue());
+                            break;
+                        } catch (RemoteException e) {
+                            Log.e(TAG, "Failed to OnDistanceChanged ");
+                            e.printStackTrace();
+                        }
+                    }
+                    case IPropertyService.PROP_CONSUMPTION_UNIT: {
+                        try {
+                            ihmiListener.OnConsumptionUnitChanged((Integer) event.getValue());
+                            break;
+                        } catch (RemoteException e) {
+                            Log.e(TAG, "Failed to OnConsumptionUnitChanged ");
+                            e.printStackTrace();
+                        }
+                    }
+                    case IPropertyService.PROP_CONSUMPTION_VALUE: {
+                        if (mList60.size() < LIST60S_SIZE) {
+                            mList60.add((Double) event.getValue());
+                            sumConsumption += (Double) event.getValue();
+                            Log.d("D/size", mList60.size() + "");
+                        } else {
+                            StringBuilder builder = new StringBuilder();
+                            for (int i = 1; i < 15; i++) {
+                                mList15[i - 1] = mList15[i];
+                                builder.append(mList15[i - 1] + ", ");
+                            }
+                            mList15[14] = sumConsumption;
+                            builder.append(mList15[14] + "");
+                            Log.d("D/mList", builder.toString());
+                            try {
+                                ihmiListener.onConsumptionChanged(mList15);
+                            } catch (RemoteException e) {
+                                Log.e(TAG, "Failed to onConsumptionChanged ");
+                                e.printStackTrace();
+                            }
+                            sumConsumption = 0;
+                            mList60.clear();
+                        }
+                    }
+                    case IPropertyService.PROP_RESET: {
+                        if (event.getPropertyId() == IPropertyService.PROP_RESET) {
+                            try {
+                                ihmiListener.onError((Boolean) event.getValue());
+                            } catch (RemoteException e) {
+                                Log.e(TAG, "Failed to onError ");
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                }
+            } else {
+                try {
+                    ihmiListener.onError(true);
+                } catch (RemoteException e) {
+                    Log.e(TAG, "Failed to onError ");
+                    e.printStackTrace();
+                }
+            }
         }
-    };
+    }
 
     private class PropertyRemoteObject extends IPropertyEventListener.Stub {
         @Override
@@ -138,117 +253,6 @@ public class MidService extends Service {
             }
             mHandler.sendMessage(msg);
         }
-
-        @Override
-        public IBinder asBinder() {
-            return super.asBinder();
-        }
-    }
-
-    @Override
-    public void onCreate() {
-        Log.d("D/e", "onCreate midservice");
-        mHandlerThread = new HandlerThread(TAG);
-        mHandlerThread.start();
-        mHandler = new ServiceHandler(mHandlerThread.getLooper());
-        bindCoreService();
-    }
-
-    private void bindCoreService() {
-        Intent intent = new Intent();
-        intent.setAction("dcv.finaltest.BIND");
-        intent.setPackage("dcv.finaltest.hmiapplication");
-        if (!bindService(intent, mCoreServiceConnection, Context.BIND_AUTO_CREATE)) {
-            Log.e(TAG, "bindService connect to Core service fail.");
-        }
-    }
-
-    private class ServiceHandler extends Handler {
-
-        ServiceHandler(Looper looper) {
-            super(looper);
-        }
-
-        @Override
-        public void handleMessage(@NonNull Message msg) {
-            PropertyEvent event = (PropertyEvent) msg.obj;
-            if (event.getStatus() == PropertyEvent.STATUS_AVAILABLE) {
-                switch (msg.what) {
-                    case IPropertyService.PROP_DISTANCE_UNIT: {
-                        Log.d("D/e", "onDistanceUnitChanged midservice");
-                        try {
-                            ihmiListener.onDistanceUnitChanged((Integer) event.getValue());
-                            break;
-                        } catch (RemoteException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                    case IPropertyService.PROP_DISTANCE_VALUE: {
-                        Log.d("D/e", "onDistanceChanged midservice");
-                        try {
-                            ihmiListener.onDistanceChanged((Double) event.getValue());
-                            break;
-                        } catch (RemoteException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                    case IPropertyService.PROP_CONSUMPTION_UNIT: {
-                        Log.d("D/e", "OnConsumptionUnitChanged midservice");
-                        try {
-                            ihmiListener.OnConsumptionUnitChanged((Integer) event.getValue());
-                            break;
-                        } catch (RemoteException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                    case IPropertyService.PROP_CONSUMPTION_VALUE: {
-                        Log.d("D/e", "onConsumptionChanged midservice");
-                        if (mList60.size() < LIST60S_SIZE) {
-                            mList60.add((Double) event.getValue());
-                            sumConsumption += (Double) event.getValue();
-                            Log.d("D/size", mList60.size() + "");
-                        } else {
-                            StringBuilder builder = new StringBuilder();
-                            for (int i = 1; i < 15; i++) {
-                                mList15[i - 1] = mList15[i];
-                                builder.append(mList15[i - 1] + ", ");
-                            }
-                            mList15[14] = sumConsumption;
-                            builder.append(mList15[14] + "");
-                            Log.d("D/mList", builder.toString());
-                            try {
-                                ihmiListener.onConsumptionChanged(mList15);
-                                Log.d("D/e", "onConsumptionChanged SEND midservice");
-                            } catch (RemoteException e) {
-                                e.printStackTrace();
-                            }
-                            sumConsumption = 0;
-                            mList60.clear();
-                        }
-                    }
-                    case IPropertyService.PROP_RESET: {
-                        if (event.getPropertyId() == IPropertyService.PROP_RESET) {
-                            try {
-                                ihmiListener.onError((Boolean) event.getValue());
-                            } catch (RemoteException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    }
-                }
-            } else {
-                try {
-                    ihmiListener.onError(true);
-                } catch (RemoteException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
-
-    @Override
-    public IBinder onBind(Intent intent) {
-        return iBinderServiceInterface;
     }
 
     @Override
