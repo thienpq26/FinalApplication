@@ -19,6 +19,8 @@ import androidx.annotation.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import dcv.finaltest.configuration.IConfigurationService;
 import dcv.finaltest.core.ICoreService;
@@ -42,6 +44,8 @@ public class MidService extends Service {
     double sumConsumption = 0.0;
     private IPropertyService mPropertyService;
     private IConfigurationService mConfigurationService;
+    private Timer timer;
+    private TimerTask timerTask;
 
     private ServiceConnection mCoreServiceConnection = new ServiceConnection() {
         @Override
@@ -106,6 +110,9 @@ public class MidService extends Service {
                 mList15[i] = 0;
             }
             ihmiListener.onConsumptionChanged(mList15);
+            ihmiListener.onDistanceChanged(0);
+            ihmiListener.onDistanceUnitChanged(0);
+            ihmiListener.OnConsumptionUnitChanged(0);
         }
     };
 
@@ -180,6 +187,7 @@ public class MidService extends Service {
                                 mList15[i - 1] = mList15[i];
                                 builder.append(mList15[i - 1] + ", ");
                             }
+                            sumConsumption /= LIST60S_SIZE;
                             mList15[14] = sumConsumption;
                             builder.append(mList15[14] + "");
                             Log.d("D/mList", builder.toString());
@@ -195,22 +203,42 @@ public class MidService extends Service {
                     }
                     case IPropertyService.PROP_RESET: {
                         if (event.getPropertyId() == IPropertyService.PROP_RESET) {
-                            try {
-                                ihmiListener.onError((Boolean) event.getValue());
-                            } catch (RemoteException e) {
-                                Log.e(TAG, "OnError to failed: ");
-                                e.printStackTrace();
+                            if ((boolean) event.getValue()) {
+                                timer = new Timer();
+                                timerTask = new TimerTask() {
+                                    @Override
+                                    public void run() {
+                                        try {
+                                            ihmiListener.onError(false);
+                                        } catch (RemoteException e) {
+                                            e.printStackTrace();
+                                        }
+                                    }
+                                };
+                                timer.schedule(timerTask, 1000, 0);
+                            } else {
+                                try {
+                                    ihmiListener.onError(false);
+                                } catch (RemoteException e) {
+                                    e.printStackTrace();
+                                }
                             }
                         }
                     }
                 }
             } else {
-                try {
-                    ihmiListener.onError(true);
-                } catch (RemoteException e) {
-                    Log.e(TAG, "OnError to failed: ");
-                    e.printStackTrace();
-                }
+                timer = new Timer();
+                timerTask = new TimerTask() {
+                    @Override
+                    public void run() {
+                        try {
+                            ihmiListener.onError(true);
+                        } catch (RemoteException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                };
+                timer.schedule(timerTask, 1000, 0);
             }
         }
     }
